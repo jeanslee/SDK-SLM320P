@@ -1,0 +1,58 @@
+/*
+ * Copyright (C) 2015-2019 Alibaba Group Holding Limited
+ */
+
+#ifndef HTTP_DEF_CONFIG_H
+#define HTTP_DEF_CONFIG_H
+
+#ifdef CONFIG_DEFINE_HTTP_CONFIG
+#include "http_config.h"
+#endif
+
+#if defined(XY_MBEDTLS) || defined(TY_MBEDTLS_CA)
+#define CONFIG_HTTP_SECURE 1
+#endif
+//#define  CONFIG_HTTP_SECURE_ITLS 0
+
+
+#ifndef CONFIG_HTTPC_SESSION_NUM
+#define CONFIG_HTTPC_SESSION_NUM 2
+#endif
+
+#ifndef CONFIG_HTTPC_SERVER_NAME_SIZE
+#define CONFIG_HTTPC_SERVER_NAME_SIZE 64
+#endif
+
+#ifndef CONFIG_HTTPC_DEFAULT_CLIENT
+#define CONFIG_HTTPC_DEFAULT_CLIENT "AliOS-HTTP-Client/2.1"
+#endif
+
+#ifndef CONFIG_HTTP_STATUS_SIZE
+#define CONFIG_HTTP_STATUS_SIZE 32
+#endif
+
+#ifndef CONFIG_HTTP_SECURE
+#if AOS_COMP_ITLS
+#define CONFIG_HTTP_SECURE 1
+#elif AOS_COMP_MBEDTLS
+#define CONFIG_HTTP_SECURE 1
+#else
+#define CONFIG_HTTP_SECURE 0
+#endif
+#endif
+
+#if CONFIG_HTTP_SECURE
+#if AOS_COMP_ITLS
+#define CONFIG_HTTP_SECURE_ITLS 1
+#else
+#define CONFIG_HTTP_SECURE_ITLS 0
+#endif
+#endif
+
+#ifndef CONFIG_HTTP_ENABLE_MUTEX
+#define CONFIG_HTTP_ENABLE_MUTEX 0
+#endif
+
+//#define CONFIG_HTTP_DEBUG
+
+#endif

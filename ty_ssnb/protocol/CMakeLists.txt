@@ -1,0 +1,5 @@
+if(EXISTS ${SOURCE_TOP_DIR}/ty_ssnb/protocol/CMakeLists.txt)
+   add_subdirectory(mqtt)
+   add_subdirectory(linksdk)
+   add_subdirectory(http)
+endif()

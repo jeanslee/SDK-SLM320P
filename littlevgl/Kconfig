@@ -1,0 +1,53 @@
+# Copyright (C) 2018 RDA Technologies Limited and/or its affiliates("RDA").
+# All rights reserved.
+#
+# This software is supplied "AS IS" without any warranties.
+# RDA assumes no responsibility or liability for the use of the software,
+# conveys no license or title under any patent, copyright, or mask work
+# right to the product. RDA reserves the right to make changes in the
+# software without notification.  RDA also make no representation or
+# warranty that such application will be suitable for the specified use
+# without further testing or modification.
+
+menu "LittlevGL GUI"
+
+config LV_GUI_THREAD_STACK_SIZE
+    int "LittlevGL GUI stack size"
+    default 4096
+    help
+        LittlevGL GUI thread stack size in byte.
+
+config LV_GUI_THREAD_EVENT_COUNT
+    int "LittlevGL GUI event count"
+    default 64
+    help
+        LittlevGL GUI thread event queue size. When event queue is full,
+        caller will be blocked.
+
+config LV_GUI_HOR_RES
+    int "LittlevGL GUI screen width"
+    default 240
+    help
+        LittlevGL GUI screen width. Though it is not necessary, usually it
+        is the same as LCD width.
+
+config LV_GUI_VER_RES
+    int "LittlevGL GUI screen height"
+    default 320
+    help
+        LittlevGL GUI screen height. Though it is not necessary, usually it
+        is the same as LCD height.
+
+config LV_GUI_SCREEN_OFF_TIMEOUT
+    int "LittlevGL GUI screen off timeout"
+    default 5000
+    help
+        When there are no inputs after the specified time, LittlevGL will
+        turn off screen to power saving.
+
+        When there are animation on the screen, LittlevGL won't turn off
+        the screen.
+
+        When not to turn off screen by timeout, set it to 0.
+
+endmenu

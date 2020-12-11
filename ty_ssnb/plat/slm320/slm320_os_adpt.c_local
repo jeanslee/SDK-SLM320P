@@ -1,0 +1,596 @@
+
+#include "ty_os_adpt.h"
+#include "mg_os_api.h"
+
+#include "osi_log.h"
+#include "osi_mem.h"
+
+#include "cfw.h"
+#include "cJSON.h"
+#include "bt_types.h"
+//#include "os_queue.h"
+//以下字段需要在Makefile中定义
+ #ifndef PRODUCT_TYPE
+ #error "no define macro SS11_PRODUCT_TYPE"
+ #endif
+
+ #ifndef FIRMWARE_VERSION
+ #error "no define macro SS11_FIRMWARE_VERSION"
+ #endif
+
+ #ifndef MQTT_PRODUCT_KEY
+ #error "no define macro SS11_MQTT_PRODUCT_KEY"
+ #endif
+
+ #ifndef MQTT_PRODUCT_SECRET
+ #error "no define macro SS11_MQTT_PRODUCT_SECRET"
+ #endif
+
+ #ifndef TY_CLOUD_MQTT_SERVER
+ #error "no define macro SS11_TY_CLOUD_MQTT_SERVER"
+ #endif
+
+
+ #ifndef TY_CLOUD_PORT
+ #error "no define macro SS11_TY_CLOUD_PORT"
+ #endif
+
+ #ifndef TY_CLOUD_HTTP_DEVREG_URL
+ #error "no define macro SS11_TY_CLOUD_HTTP_DEVREG_URL"
+ #endif
+
+
+//产品名称
+//const char *PRODUCT_TYPE = SS11_PRODUCT_TYPE;
+//固件版本(FOTA升级时需要用于匹配校验)
+//const char *FIRMWARE_VERSION = SS11_FIRMWARE_VERSION;
+//(用于三元组动态注册和认证)
+//const char *MQTT_PRODUCT_KEY = SS11_MQTT_PRODUCT_KEY;
+//(用于三元组动态注册)
+//const char *MQTT_PRODUCT_SECRET = SS11_MQTT_PRODUCT_SECRET;
+//MQTT平台地址
+//const char *TY_CLOUD_MQTT_SERVER = SS11_TY_CLOUD_MQTT_SERVER;
+//MQTT端口号
+//int TY_CLOUD_PORT = SS11_TY_CLOUD_PORT;
+//设备动态注册地址
+//const char *TY_CLOUD_HTTP_DEVREG_URL = SS11_TY_CLOUD_HTTP_DEVREG_URL;
+#define LOG_TAG OSI_MAKE_LOG_TAG('M', 'Y', 'A', 'P')
+
+typedef struct 
+{
+    UINT32 *handle;
+    UINT32 msg_size;
+}QueWrapper;
+
+typedef struct msg{
+    uint32_t messageid;
+    void* data;
+}msg_t;
+
+#if MEMLEAK_CHECK
+//do nothing
+#else
+
+void * lpa_malloc( size_t size)
+{
+	 return osiMalloc(size);
+}
+
+void lpa_free(void * ptr)
+{
+    if(ptr)
+    osiFree(ptr);
+}
+
+void *lpa_calloc(size_t nitems, size_t size)
+{
+	return osiCalloc(nitems, size);
+}
+
+void* lpa_realloc(void *ptr, size_t size)
+{
+	return osiRealloc(ptr, size);
+}
+#endif
+
+void * ty_create_mutex()
+{
+	osiMutex_t *mutex_t =  MG_osiMutexCreate();
+    if(!mutex_t)
+        return NULL;   
+	return (void *)mutex_t;
+}
+
+void ty_mutex_lock(void *mutex,uint32_t timeout)
+{
+	if(!mutex)
+        return ;
+     MG_osiMutexTryLock((osiMutex_t*)mutex, timeout);
+
+}
+
+void ty_mutex_unlock(void *mutex)
+{
+	if(!mutex)
+		return ;
+	MG_osiMutexUnlock((osiMutex_t*)mutex);
+}
+
+void ty_mutex_destroy(void *mutex)
+{
+	if(!mutex)
+            return ;
+	MG_osiMutexDelete((osiMutex_t *)mutex);
+    mutex = NULL;
+}
+
+#if 1
+ void *ty_create_msg_Que(uint32_t msg_count, uint32_t msg_size)
+{
+    QueWrapper *wrapper = lpa_malloc(sizeof(QueWrapper));
+    if(wrapper == NULL)
+        return NULL;
+    wrapper->msg_size = msg_size;
+<<<<<<< .mine
+    wrapper->handle = MG_osiMessageQueueCreate(msg_count, sizeof(msg_t *));
+||||||| .r173698
+    wrapper->handle = MG_osiMessageQueueCreate(msg_count, msg_size);
+=======
+    wrapper->handle = MG_osiMessageQueueCreate(msg_count, sizeof(msg_t*));
+>>>>>>> .r173705
+#ifdef ADPT_DEBUG 
+    LOG("%s %x : msg_size = %d",__FUNCTION__,wrapper->handle, wrapper->msg_size);
+#endif
+    return (void*)wrapper;
+}
+
+void ty_delete_msg_que(void *mq)
+{
+    QueWrapper *wrapper = (QueWrapper *)mq;
+#ifdef ADPT_DEBUG     
+    LOG("%s %x : msg_size = %d",__FUNCTION__,wrapper->handle, wrapper->msg_size);
+#endif
+    if(wrapper)
+    {
+        MG_osiMessageQueueDelete(wrapper->handle);
+        lpa_free(wrapper);
+        wrapper = NULL;
+    }
+}
+
+bool ty_put_msg_que(void *mq, const void *msg, uint32_t timeout)
+{
+    QueWrapper *wrapper = (QueWrapper *)mq;
+    int ret;
+    if(wrapper == NULL)
+        return false;
+    msg_t *temp = lpa_malloc(sizeof(msg_t));
+    temp->data = lpa_malloc(wrapper->msg_size);
+    if(temp == NULL || temp->data == NULL)
+        return false;
+    memcpy(temp->data, msg, wrapper->msg_size);
+#ifdef ADPT_DEBUG     
+    LOG("%s %x : msg_size = %d",__FUNCTION__,wrapper->handle, wrapper->msg_size);
+#endif
+//    ret = MG_osiMessageQueueTryPut((osiMessageQueue_t*)wrapper->handle, (void*)&temp, timeout);
+     ret = MG_osiMessageQueuePut((osiMessageQueue_t*)wrapper->handle, (void*)&temp);
+    return ret;
+}
+
+bool ty_get_msg_que(void *mq,void *msg, uint32_t timeout)
+{
+    QueWrapper *wrapper = (QueWrapper *)mq;
+    msg_t *temp = NULL;
+    if(wrapper == NULL)
+        return false;
+    int ret ;
+#ifdef ADPT_DEBUG     
+    LOG("%s %x : msg_size = %d",__FUNCTION__,wrapper->handle, wrapper->msg_size);
+#endif
+<<<<<<< .mine
+    ret = MG_osiMessageQueueTryGet((osiMessageQueue_t*)wrapper->handle, (void*)&temp, timeout);
+    LOG("%s %x : ret = %d",__FUNCTION__,wrapper->handle, ret);
+
+    //if(ret == 1 && temp != NULL && temp->data)
+        
+    // LOG("%s get OK",__FUNCTION__);
+    //return ret;
+    if(ret == 1 && temp != NULL && temp->data)
+||||||| .r173698
+    ret = MG_osiMessageQueueTryGet((osiMessageQueue_t*)wrapper->handle, (void*)&temp, timeout);
+  
+    if(ret == 1 && temp != NULL)
+=======
+//    ret = MG_osiMessageQueueTryGet((osiMessageQueue_t*)wrapper->handle, (void*)&temp, timeout);
+ ret = MG_osiMessageQueueGet((osiMessageQueue_t*)wrapper->handle, (void*)&temp);
+
+    if(ret == 1 && temp != NULL)
+>>>>>>> .r173705
+    {
+//        LOG("%s temp: %s", __func__, temp->data);
+        if(msg != NULL)
+            memcpy(msg, temp->data, wrapper->msg_size);
+        lpa_free(temp->data);
+        temp->data = NULL;
+        lpa_free(temp);
+        temp = NULL;
+        return true;
+    }
+    else
+        LOG("%s : no message", __func__);
+    return false;
+}
+
+#endif
+uint32_t ty_get_tick_ms()
+{
+    int64_t ret = MG_osiUpTimeUS();
+//    LOG("%s, time  = %ld\r\n", __func__, ret);
+    return ret/1000;
+}
+
+void ty_sleep(int ms)
+{
+    osiThreadSleep(ms);   
+} 
+
+void LOG(const char *format, ... )
+{
+    va_list argp;
+    char str[300] = {0};
+    int ret = 0;
+    va_start(argp, format);
+    ret = vsnprintf( str, sizeof(str), format, argp);    
+    va_end(argp);
+    MG_osiTracePrintf(LOG_TAG, str);
+}
+
+void ty_printf_hexbuf(char *message,int len)
+{
+    int i;
+    for(i = 0;i < strlen(message);i+=64)
+    {
+        char debug[64+3] = {0};
+        memcpy(debug,message+i,(len-i >= 64) ? 64:(len-i));
+        LOG("%i,[%s]\r\n",i,debug);
+    }
+
+}
+
+int ty_task_create(ty_task_func_t task_entry,char * name,int StackSize,void *pvParameters,int Priority,void * TCB_hanndler)
+{
+    uint32_t *handle = (uint32_t*)TCB_hanndler;
+   *handle = (uint32_t)MG_osiThreadCreate(name, task_entry, pvParameters, OSI_PRIORITY_NORMAL, StackSize);  ; 
+    if(*handle == NULL)
+    {
+        MG_osiTracePrintf(LOG_TAG,"ty_task_create create failed\n");
+        return -1;
+    }
+     return 0;  
+}
+
+void ty_task_delete( void *TCB_hanndler )
+{
+	uint32_t* currentId =  (uint32_t*)MG_osiThreadCurrent() ;
+	if(currentId == *(uint32_t*)TCB_hanndler)
+	{
+		MG_osiTracePrintf(LOG_TAG, " ty_task_delete ok\n");
+		MG_osiThreadExit();
+	}
+}
+
+uint32_t ty_semaphore_create(uint32_t *pSemaphoreId)
+{
+	uint32_t max_count = 10;
+	uint32_t init_count = 1;
+	osiSemaphore_t* sem = MG_osiSemaphoreCreate(max_count, init_count);
+	if(sem == NULL)
+		return -1;
+	*pSemaphoreId = (uint32_t)sem;
+	return 1;
+}
+
+uint32_t ty_semaphore_take(uint32_t *pSemaphoreId,uint32_t xTicksToWait_ms)
+{
+     MG_osiSemaphoreAcquire((osiSemaphore_t*)pSemaphoreId);
+     ty_sleep(xTicksToWait_ms);
+}
+
+uint32_t ty_semaphore_give(uint32_t *pSemaphoreId)
+{
+    MG_osiSemaphoreRelease((osiSemaphore_t*)pSemaphoreId);
+}
+
+uint32_t ty_semaphore_destroy(uint32_t *pSemaphoreId)
+{
+	MG_osiSemaphoreDelete((osiSemaphore_t*)pSemaphoreId);
+	if(!pSemaphoreId)
+		return 1;
+	return  -1;
+}
+
+uint32_t ty_timer_create(char* name, uint32_t *pTimerId,uint32_t ulTimerTick_ms,const uint32_t uxAutoReload, ty_timer_func_t callback_func )
+{
+	*pTimerId = (uint32_t)MG_osiTimerCreate(NULL, callback_func, NULL);
+	if(NULL == *pTimerId)
+	{
+		MG_osiTracePrintf(LOG_TAG,"timer create failed\n");
+
+	}
+	if (MG_osiTimerSetPeriod( *pTimerId, ulTimerTick_ms, true))
+	{
+		MG_osiTracePrintf(LOG_TAG, "MG set period success");
+	}
+	else
+	{
+		MG_osiTracePrintf(LOG_TAG, "MG set period failed");
+	}
+	return *pTimerId;     
+}
+
+uint32_t ty_timer_start(uint32_t *pTimerId)
+{
+    return MG_osiTimerStartLast((osiTimer_t *)*pTimerId);  
+}
+
+uint32_t ty_timer_stop(uint32_t *pTimerId)
+{
+    return MG_osiTimerStop((osiTimer_t *)*pTimerId);  
+}
+
+uint32_t ty_timer_reset(uint32_t *pTimerId)
+{
+     // return -1;
+}
+
+uint32_t ty_timer_delete(uint32_t *pTimerId)
+{
+	MG_osiTimerDelete((osiTimer_t *)*pTimerId);
+	return 0;
+}
+
+void ty_work_lock(int lock_dsp)
+{
+   
+}
+
+void ty_work_unlock()
+{
+ 
+}
+
+
+//注册网络并获取信号强度
+static uint8_t int_net(const char *pApn, uint8_t *siglevel)
+{
+	uint8_t cid = 1;
+	if(MG_NwModifyPdpContext(0,cid,1,pApn))
+	{
+		MG_osiTracePrintf(LOG_TAG, "modify pdp ctxt success");
+		if(MG_NwActivePdpContext(0,cid))
+		{
+			MG_osiThreadSleep(10000);
+			MG_osiTracePrintf(LOG_TAG, "activate pdp ctxt success");
+		}
+		else
+		{
+			MG_osiTracePrintf(LOG_TAG, "activate pdp ctxt failure");
+		}
+		bool active = false;
+		while(!active){
+		MG_osiThreadSleep(1000);
+		MG_osiTracePrintf(LOG_TAG, "no active pdp context,check again");
+		active = MG_NwHasActivePdp(0);
+		}
+		
+		uint8_t rat = 0, biterr = 0;
+		if(MG_NwGetSignalQuality(&rat, siglevel, &biterr)){
+		MG_osiTracePrintf(LOG_TAG, "have active pdp context.");
+		return *siglevel;
+		}
+	}
+	
+    return -1;
+}
+static bool getApn(char name[THE_APN_MAX_LEN]){
+	CFW_GPRS_PDPCONT_DFTPDN_INFO PdnInfo = {0,};
+	memset(&PdnInfo, 0, sizeof(CFW_GPRS_PDPCONT_DFTPDN_INFO));
+	MG_CFW_GprsGetDefaultPdnInfo(&PdnInfo, 0);
+	memcpy(name, PdnInfo.AccessPointName, PdnInfo.APNLen);
+	for(int i = 0; ((i < PdnInfo.APNLen)&&(PdnInfo.AccessPointName[i]!='\0')); ++i)
+	{
+		if(PdnInfo.AccessPointName[i] == '.'){
+		name[i] = '\0';
+		break;
+		}
+		name[i] = PdnInfo.AccessPointName[i];
+	}
+	return (name[0]) ? false : true ;
+}
+
+// Return      : if return 1,tcpip is OK;else PDP not active,or not have SIM card;
+int ty_wait_tcpip_ok(int timeout)
+{
+       int ret = -1;
+    	int simStatus = 0, registerStatus = 0;
+	char name[THE_APN_MAX_LEN] = {0};
+	uint8_t siglevel = 0;
+        uint64_t   ts_end = MG_osiEpochTime() + timeout;
+        int64_t time_left;
+    
+do{
+        simStatus = MG_cfwGetSimStatus(0);   //获取sim卡状态
+        
+#if ADPT_DEBUG
+	MG_osiTracePrintf(LOG_TAG, "SIM status : %d", simStatus);
+#endif
+        
+        	//获取运营商名称
+	while(getApn(name)){
+                        time_left = 0;
+                        time_left = ts_end - (uint64_t)MG_osiEpochTime(); 
+#if ADPT_DEBUG
+//                        MG_osiTracePrintf(LOG_TAG, "time_left %ld\r\n", time_left);
+#endif
+                        if (time_left < 0 && timeout != 0) {
+#if ADPT_DEBUG                
+                            MG_osiTracePrintf(LOG_TAG, "get APN timeout\r\n");
+#endif 
+                            return -1;
+                        }
+                     
+#if ADPT_DEBUG         
+//             MG_osiTracePrintf(LOG_TAG, "get APN\r\n");
+#endif
+		MG_osiThreadSleep(1000);
+	}
+#if ADPT_DEBUG    
+	MG_osiTracePrintf(LOG_TAG, "Operators : %s", name);
+#endif
+        simStatus = MG_cfwGetSimStatus(0);   //再次获取sim卡状态        
+#if ADPT_DEBUG
+	MG_osiTracePrintf(LOG_TAG, "check again SIM status : %d", simStatus);
+#endif
+        	//获取网络状态
+	CFW_NW_STATUS_INFO sStatus;
+	uint32_t uErrCode = MG_CFW_GprsGetstatus(&sStatus, 0);
+	if(uErrCode == 0)
+	{
+		registerStatus = sStatus.nStatus;
+	}
+	else
+	{
+		registerStatus = -1;
+#if ADPT_DEBUG        
+             MG_osiTracePrintf(LOG_TAG, "register status: %d", registerStatus);
+#endif            
+	}
+#if ADPT_DEBUG        
+	MG_osiTracePrintf(LOG_TAG, "register status: %d", registerStatus);
+#endif
+        if(simStatus != 0)
+        {
+                if(-1 == int_net(name, &siglevel))
+                {
+#if ADPT_DEBUG                    
+                    MG_osiTracePrintf(LOG_TAG, "register failed");
+#endif
+                    ret = -1;
+                    break;
+                }
+                else
+                {
+#if ADPT_DEBUG                        
+                    MG_osiTracePrintf(LOG_TAG, "signal quality : %d", siglevel);
+#endif
+                    ret = 1;
+                    break;
+                }
+        }
+        else
+        {
+#if ADPT_DEBUG            
+                MG_osiTracePrintf(LOG_TAG, "sim error : %d", simStatus);
+#endif
+                ret = -1;
+                break;
+
+        }
+    }while(0);
+    return ret;
+}
+
+int ty_rtc_get_sec (int zone_sec)
+{   
+    // UINT32 pDateTime = 0;
+    // if(opencpu_rtc_get_int_time(&pDateTime)  != 1)
+        // opencpu_printf("get datetime failed!\n"); 
+    // return pDateTime;
+    return -1;
+}
+
+void ty_assert_proc(int value,char* filename, int lineno)
+{
+	if(!value)
+	{
+		LOG("ASSERT %s %d \n", __func__, __LINE__);
+		assert(value);
+	}
+}
+
+
+void ty_get_timestamp(char* timeBuff)
+{
+//    int64_t st;
+//    int64_t *upSecond = &st;
+//     char str_tmp[50];
+//     memset(str_tmp, 0, 50);
+//    st =  MG_osiLocalSecond();
+//     opencpu_printf("TIME:%04d/%02d/%02d,%02d:%02d:%02d\n",\
+//         st.uYear, st.uMonth, st.uDay, st.uHour, st.uMinute, st.uSecond);
+
+//     opencpu_systemtime_to_strtime(&st, str_tmp);
+//   LOG("str_tmp:%s\n", str_tmp);
+//     strncpy(timeBuff, str_tmp, strlen(str_tmp));
+}
+
+static inline void*  nb12_plat_malloc(uint32_t ulSize)
+{
+    // return opencpu_malloc (ulSize);
+}
+
+static inline void nb12_plat_xy_free(void* pMem)
+{
+    // opencpu_free (pMem);
+}
+
+static void  psm_enter_cb(void)
+{
+    // opencpu_printf("%s\r\n",__FUNCTION__);
+    // save_user_nv_flash ();
+}
+
+static void  psm_quit_cb(void)
+{
+    // opencpu_printf("%s\r\n",__FUNCTION__);
+    // read_user_nv_flash ();
+}
+
+#if MEMLEAK_CHECK
+static inline void*  slm320_dbg_malloc(uint32_t ulSize)
+{
+    return lpa_malloc (ulSize);
+}
+
+static inline void slm320_dbg_free(void* pMem)
+{
+    lpa_free (pMem);
+}
+#endif
+
+
+void ty_plat_os_init()
+{
+    #if MEMLEAK_CHECK
+    memleak_set_plat_malloc_free (osiMalloc, osiFree);
+    dbg_init(1000);
+    dbg_catch_sigsegv();
+    //设置CJSON内存申请和释放钩子函数
+    cJSON_Hooks hooks;
+    hooks.malloc_fn = slm320_dbg_malloc;
+    hooks.free_fn = slm320_dbg_free;
+    cJSON_InitHooks(&hooks);
+    #else
+    cJSON_Hooks hooks;
+    hooks.malloc_fn = osiMalloc;
+    hooks.free_fn = osiFree;
+    cJSON_InitHooks(&hooks);
+    #endif
+    
+  //  //SS11没有数据读取钩子函数，需要开机时主动读取FLASH数据
+     read_user_nv_flash ();
+  //  // 添加PSM掉电回调接口，用于数据保存与恢复
+    // opencpu_register_psmtable_callback (psm_enter_cb , psm_quit_cb);
+}
+
+
